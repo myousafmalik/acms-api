@@ -2,18 +2,15 @@
 
 ## How to run
 
-`git clone <repo-url>`
+* `git clone <repo-url>`
 
-`py -m venv env`
+* `py -m venv env`
 
-activate the env
-windows, cmd -> `.\env\Scripts\activate`
+* activate the env. for windows, cmd -> `.\env\Scripts\activate`
 
-install dependencies
-`pip install -r requirenments.txt`
+* install dependencies. `pip install -r requirenments.txt`
 
-run server
-`uvicorn main:app`
+* run server. `uvicorn main:app`
 
 
 change the db name from the config.settings
