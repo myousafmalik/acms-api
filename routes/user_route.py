@@ -3,120 +3,127 @@ import traceback
 from datetime import datetime, date
 from uuid import uuid4
 
-from dateutil.relativedelta import relativedelta
-from fastapi import APIRouter, status, Depends, Request, Response, File, UploadFile, Form
+from fastapi import (
+    APIRouter,
+    status,
+    Depends,
+    Request,
+    Response,
+    File,
+    UploadFile,
+    Form,
+)
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException
-from fastapi.responses import FileResponse
 from fastapi_jwt_auth import AuthJWT
-# from google.auth.transport import requests
-# from google.oauth2 import id_token
+
 from sqlalchemy.orm import Session
-from werkzeug.security import generate_password_hash, check_password_hash
 
 from controller import deps
-from models.user import User
-from schema.userSchema import UserLogin, UserSignUp, GoogleInfo, UserForget
+from schema.userSchema import UserLogin, UserSignUp
+from sqlalchemy import text
 
-auth_router = APIRouter(
-    prefix='/user',
-    tags=['user']
-
-)
+auth_router = APIRouter(prefix="/user", tags=["user"])
 
 
-@auth_router.post('/signup', status_code=status.HTTP_201_CREATED)
-async def signup(user: UserSignUp, res: Response, session: Session = Depends(deps.get_session),
-                 Authorize: AuthJWT = Depends()):
+@auth_router.post("/signup", status_code=status.HTTP_201_CREATED)
+async def signup(
+    user: UserSignUp,
+    res: Response,
+    session: Session = Depends(deps.get_session),
+    Authorize: AuthJWT = Depends(),
+):
     """
-        ## Create a user
-        This requires the following
-        ```
-            -email: str
-            -password: str
-        ```
+    ## Create a user
+    This requires the following
+    ```
+        -p_no: int
+        -email: str
+    ```
 
     """
     response = {}
     try:
-        db_email = session.query(User).filter(User.email == user.email).first()
-        if db_email is not None and user.id_token:
-            res.status_code = status.HTTP_400_BAD_REQUEST
-            return HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                                 detail="User with the email already exists")
-
-        u_id = str(uuid4())
-        new_user = User(
-            user_id=u_id,
-            email=user.email,
-            password=generate_password_hash(user.password) if user.password else None,
-            is_active=True,
+        outs = session.execute(
+            "SELECT * FROM crew_personal where p-no = :p-no", {"p-no": user.p_no}
         )
+        ress = outs.fetchone()
+        if ress is not None:
+            res.status_code = status.HTTP_400_BAD_REQUEST
+            return HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User with the uid already exists",
+            )
 
-        session.add(new_user)
+        data = {"uid": user.p_no, "role_id": 77, "password": user.password}
+        statement = text(
+            """INSERT INTO usesrs(p_no, role_id, password) VALUES(:uid, :role_id, :password)"""
+        )
+        session.execute(statement, **data)
+
+        data = {"user_id": user.p_no, "role_id": 77}
+        statement = text(
+            """INSERT INTO users_roles(uid, role_id) VALUES(:uid, :role_id)"""
+        )
+        session.execute(statement, **data)
+
         session.commit()
-        access_token = Authorize.create_access_token(subject=new_user.user_id, expires_time=False)
+
         response = {
-            'status_code': status.HTTP_201_CREATED,
-            'detail': 'User created successfully',
-            'email': new_user.email,
+            "status_code": status.HTTP_201_CREATED,
+            "detail": "User created successfully",
+            "p_no": user.p_no,
         }
         return jsonable_encoder(response)
     except Exception as e:
         print("Error", e)
         print(traceback.format_exc())
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unexpected Error")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Unexpected Error"
+        )
 
 
-@auth_router.post('/login', status_code=status.HTTP_201_CREATED)
-async def login(user: UserLogin, req: Request, response: Response, session: Session = Depends(deps.get_session),
-                Authorize: AuthJWT = Depends()):
+@auth_router.post("/login", status_code=status.HTTP_201_CREATED)
+async def login(
+    user: UserLogin,
+    req: Request,
+    response: Response,
+    session: Session = Depends(deps.get_session),
+    Authorize: AuthJWT = Depends(),
+):
     """
-        ## Login a user
-        This requires
-            ```
-                username:str
-                password:str
-            ```
-        and returns a token pair `access`
+    ## Login a user
+    This requires
+        ```
+            p_no:int
+            email:str
+        ```
+    and returns a token pair `access`
     """
     try:
-        db_user = session.query(User).filter(User.email == user.email).first()
-        if db_user and check_password_hash(db_user.password, user.password):
-            access_token = Authorize.create_access_token(subject=db_user.user_id, expires_time=False)
+        outs = session.execute(
+            "SELECT * FROM crew_personal where p-no = :p-no and email = :email",
+            {"p-no": user.p_no, "email": user.emailF},
+        )
+        db_user = outs.fetchone()
+
+        if db_user:
             res = {
-                'status_code': status.HTTP_201_CREATED,
-                'detail': 'Login Successfully',
-                'email': db_user.email,
-                'token': access_token,
+                "status_code": status.HTTP_201_CREATED,
+                "detail": "Login Successfully",
+                "p_no": db_user.p_no,
             }
             return res
+
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                             detail="Invalid Username Or Password")
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid p_no Or email",
+        )
+
     except Exception as e:
         print("Error", e)
         print(traceback.format_exc())
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unexpected Error")
-
-
-@auth_router.post("/forget", status_code=status.HTTP_201_CREATED)
-async def forget(info: UserForget, response: Response, session: Session = Depends(deps.get_session)):
-    try:
-        user = session.query(User).filter(User.email == info.email).first()
-        if user:
-            user.password = generate_password_hash(info.new_password)
-            session.commit()
-            return {
-                'status_code': status.HTTP_201_CREATED,
-                'detail': 'Password updated successfully'
-            }
-
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                             detail="User Not found with this email")
-    except Exception as e:
-        print("Error", e)
-        print(traceback.format_exc())
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unexpected Error")
-
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Unexpected Error"
+        )

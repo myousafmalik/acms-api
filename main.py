@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from config import settings
 from controller.database import Base, engine
 from routes.user_route import auth_router
-
+from routes.flights import flight_router
 
 def create_tables():  # new
     Base.metadata.create_all(bind=engine)
@@ -18,6 +18,7 @@ def create_tables():  # new
 
 def include_router(app_instance):
     app_instance.include_router(auth_router)
+    app_instance.include_router(flight_router)
 
 
 def start_application():
