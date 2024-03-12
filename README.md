@@ -1,5 +1,11 @@
 # ACMS
 
+
+## Required
+python
+mysql
+mysql workbench
+
 ## How to run
 
 * `git clone <repo-url>`
