@@ -8,7 +8,7 @@ SQLALCHEMY_DATABASE_URL = settings.DATABASE_URL
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    echo=False,
+    echo=True,
     pool_pre_ping=True,
     pool_recycle=3600)
 

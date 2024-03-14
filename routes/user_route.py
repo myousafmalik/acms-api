@@ -20,7 +20,7 @@ from fastapi_jwt_auth import AuthJWT
 from sqlalchemy.orm import Session
 
 from controller import deps
-from schema.userSchema import UserLogin, UserSignUp
+from schema.userSchema import UserLogin, UserSignUp, GetUserProfile, UpdateUserProfile
 from sqlalchemy import text
 
 auth_router = APIRouter(prefix="/user", tags=["user"])
@@ -28,10 +28,7 @@ auth_router = APIRouter(prefix="/user", tags=["user"])
 
 @auth_router.post("/signup", status_code=status.HTTP_201_CREATED)
 async def signup(
-    user: UserSignUp,
-    res: Response,
-    session: Session = Depends(deps.get_session),
-    Authorize: AuthJWT = Depends(),
+    user: UserSignUp, res: Response, session: Session = Depends(deps.get_session)
 ):
     """
     ## Create a user
@@ -85,11 +82,7 @@ async def signup(
 
 @auth_router.post("/login", status_code=status.HTTP_201_CREATED)
 async def login(
-    user: UserLogin,
-    req: Request,
-    response: Response,
-    session: Session = Depends(deps.get_session),
-    Authorize: AuthJWT = Depends(),
+    user: UserLogin, response: Response, session: Session = Depends(deps.get_session)
 ):
     """
     ## Login a user
@@ -127,3 +120,93 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Unexpected Error"
         )
+
+
+@auth_router.patch("/{c_id}/profile", status_code=status.HTTP_201_CREATED)
+async def profile(
+    cid: str, payload: GetUserProfile, session: Session = Depends(deps.get_session)
+):
+    """
+    ## Add profile
+
+    This requires the following
+    cid: str (p_no)
+    """
+    try:
+
+        sql_query = """
+            SELECT *
+            FROM crew_personal
+            WHERE crew_personal.`p-no` = :p_no limit 1"""
+
+        params = {"p_no": cid}
+
+        # Execute the query
+        user_profile = session.execute(text(sql_query), params)
+
+        user_profile = UpdateUserProfile(**[_profile for _profile in user_profile][0])
+        p_query = ""
+
+        for u_field in user_profile.dict().keys():
+            to_update = getattr(payload, u_field)
+            if to_update is not None:
+                setattr(user_profile, u_field, to_update)
+
+            p_query += f"{u_field} = :{u_field}, "
+
+        p_query = p_query[:-2]
+        query = "Update crew_personal SET "
+        query += p_query
+        query += f" WHERE crew_personal.`p-no` = :p_no"
+
+        res = session.execute(text(query), {**user_profile.dict(), **{"p_no": cid}})
+        session.commit()
+
+        response = {
+            "status_code": status.HTTP_200_OK,
+            "detail": "Profile updated successfully",
+        }
+    except Exception as e:
+        response = {
+            "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "detail": "Error updated",
+            "error": str(e),
+        }
+
+    return response
+
+
+@auth_router.get("/{c_id}/profile", status_code=status.HTTP_200_OK)
+async def get_profile(cid: str, session: Session = Depends(deps.get_session)):
+    """
+    ## Get profile
+    This requires the following
+    ```
+        cid: str (p_no)
+    ```
+    """
+    response = {}
+    try:
+        sql_query = """
+            SELECT *
+            FROM crew_personal
+            WHERE crew_personal.`p-no` = :p_no limit 1"""
+
+        params = {"p_no": cid}
+
+        # Execute the query
+        user_profile = session.execute(text(sql_query), params)
+
+        response = {
+            "status_code": status.HTTP_200_OK,
+            "detail": "Profile retrieved successfully",
+            "profile": GetUserProfile(**[_profile for _profile in user_profile][0]),
+        }
+    except Exception as e:
+        response = {
+            "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "detail": "Error retrieving flights",
+            "error": str(e),
+        }
+
+    return response
