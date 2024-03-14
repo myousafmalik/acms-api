@@ -21,6 +21,7 @@ from fastapi_jwt_auth import AuthJWT
 from sqlalchemy.orm import Session
 
 from controller import deps
+from controller.deps import is_authenticated
 from controller.utils import users_dict, generate_random_number
 from schema.userSchema import UserLogin, UserSignUp, GetUserProfile, UpdateUserProfile
 from sqlalchemy import text
@@ -160,14 +161,19 @@ async def login(
 
 @auth_router.patch("/{cid}/profile", status_code=status.HTTP_201_CREATED)
 async def profile(
-    cid: str, payload: GetUserProfile, session: Session = Depends(deps.get_session)
+    cid: str,
+    secret: str,
+    payload: GetUserProfile,
+    session: Session = Depends(deps.get_session),
 ):
     """
     ## Add profile
 
     This requires the following
     cid: str (p_no)
+    secret: str
     """
+    is_authenticated(cid, secret)
     try:
 
         sql_query = """
@@ -220,14 +226,19 @@ async def profile(
 
 
 @auth_router.get("/{cid}/profile", status_code=status.HTTP_200_OK)
-async def get_profile(cid: str, session: Session = Depends(deps.get_session)):
+async def get_profile(
+    cid: str, secret: str, session: Session = Depends(deps.get_session)
+):
     """
     ## Get profile
     This requires the following
     ```
         cid: str (p_no)
+        secret: str
     ```
     """
+    is_authenticated(cid, secret)
+
     response = {}
     try:
         sql_query = """
