@@ -122,7 +122,7 @@ async def login(
         )
 
 
-@auth_router.patch("/{c_id}/profile", status_code=status.HTTP_201_CREATED)
+@auth_router.patch("/{cid}/profile", status_code=status.HTTP_201_CREATED)
 async def profile(
     cid: str, payload: GetUserProfile, session: Session = Depends(deps.get_session)
 ):
@@ -141,10 +141,17 @@ async def profile(
 
         params = {"p_no": cid}
 
-        # Execute the query
+        # Execute the
         user_profile = session.execute(text(sql_query), params)
+        user_profile = [_profile for _profile in user_profile]
+        if len(user_profile) == 0:
+            response = {
+                "status_code": status.HTTP_404_NOT_FOUND,
+                "detail": "Profile not found",
+            }
+            return response
 
-        user_profile = UpdateUserProfile(**[_profile for _profile in user_profile][0])
+        user_profile = UpdateUserProfile(**user_profile[0])
         p_query = ""
 
         for u_field in user_profile.dict().keys():
@@ -159,7 +166,7 @@ async def profile(
         query += p_query
         query += f" WHERE crew_personal.`p-no` = :p_no"
 
-        res = session.execute(text(query), {**user_profile.dict(), **{"p_no": cid}})
+        session.execute(text(query), {**user_profile.dict(), **{"p_no": cid}})
         session.commit()
 
         response = {
@@ -176,7 +183,7 @@ async def profile(
     return response
 
 
-@auth_router.get("/{c_id}/profile", status_code=status.HTTP_200_OK)
+@auth_router.get("/{cid}/profile", status_code=status.HTTP_200_OK)
 async def get_profile(cid: str, session: Session = Depends(deps.get_session)):
     """
     ## Get profile
@@ -196,16 +203,23 @@ async def get_profile(cid: str, session: Session = Depends(deps.get_session)):
 
         # Execute the query
         user_profile = session.execute(text(sql_query), params)
+        user_profile = [_profile for _profile in user_profile]
+        if len(user_profile) == 0:
+            response = {
+                "status_code": status.HTTP_404_NOT_FOUND,
+                "detail": "Profile not found",
+            }
+            return response
 
         response = {
             "status_code": status.HTTP_200_OK,
             "detail": "Profile retrieved successfully",
-            "profile": GetUserProfile(**[_profile for _profile in user_profile][0]),
+            "profile": GetUserProfile(**user_profile[0]),
         }
     except Exception as e:
         response = {
             "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "detail": "Error retrieving flights",
+            "detail": "Error retrieving profile",
             "error": str(e),
         }
 
