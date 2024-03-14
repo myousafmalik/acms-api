@@ -1,30 +1,21 @@
-import os
 import traceback
-from datetime import datetime, date
-from random import random
-from uuid import uuid4
+from datetime import date
 
 from fastapi import (
     APIRouter,
     status,
     Depends,
-    Request,
     Response,
-    File,
-    UploadFile,
-    Form,
 )
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException
-from fastapi_jwt_auth import AuthJWT
-
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from controller import deps
 from controller.deps import is_authenticated
 from controller.utils import users_dict, generate_random_number
 from schema.userSchema import UserLogin, UserSignUp, GetUserProfile, UpdateUserProfile
-from sqlalchemy import text
 
 auth_router = APIRouter(prefix="/user", tags=["user"])
 

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import  Any
+from typing import Any
 
 
 class UserLogin(BaseModel):
