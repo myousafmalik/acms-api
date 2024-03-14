@@ -1,15 +1,17 @@
 from pydantic import BaseModel
-from typing import Union, Any
+from typing import  Any
 
 
 class UserLogin(BaseModel):
     p_no: str
-    email: str
+    password: str
+    uid: int
 
 
 class UserSignUp(BaseModel):
     p_no: str
     email: str
+    password: str
 
 
 class UpdateUserProfile(BaseModel):

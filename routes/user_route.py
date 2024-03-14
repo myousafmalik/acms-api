@@ -1,6 +1,7 @@
 import os
 import traceback
 from datetime import datetime, date
+from random import random
 from uuid import uuid4
 
 from fastapi import (
@@ -20,6 +21,7 @@ from fastapi_jwt_auth import AuthJWT
 from sqlalchemy.orm import Session
 
 from controller import deps
+from controller.utils import users_dict, generate_random_number
 from schema.userSchema import UserLogin, UserSignUp, GetUserProfile, UpdateUserProfile
 from sqlalchemy import text
 
@@ -36,13 +38,14 @@ async def signup(
     ```
         -p_no: int
         -email: str
+        -password: str
     ```
-
+    and returns an uid
     """
     response = {}
     try:
         outs = session.execute(
-            "SELECT * FROM crew_personal where p-no = :p-no", {"p-no": user.p_no}
+            "SELECT * FROM crew_personal where `p-no` = :p_no", {"p_no": user.p_no}
         )
         ress = outs.fetchone()
         if ress is not None:
@@ -52,27 +55,45 @@ async def signup(
                 detail="User with the uid already exists",
             )
 
-        data = {"uid": user.p_no, "role_id": 77, "password": user.password}
+        data = {"r_id": 77, "password": user.password}
         statement = text(
-            """INSERT INTO usesrs(p_no, role_id, password) VALUES(:uid, :role_id, :password)"""
+            """INSERT INTO users(role_id, password) VALUES(:r_id, :password)"""
         )
-        session.execute(statement, **data)
+        session.execute(statement, data)
 
-        data = {"user_id": user.p_no, "role_id": 77}
+        # Fetch the last inserted ID using the LAST_INSERT_ID() function
+        res = session.execute("SELECT LAST_INSERT_ID() as uid")
+        inserted_row = res.fetchone()
+        uid = inserted_row.uid
+
+        data = {"uid": uid, "role_id": 77}
         statement = text(
-            """INSERT INTO users_roles(uid, role_id) VALUES(:uid, :role_id)"""
+            """INSERT INTO users_roles(user_id, role_id) VALUES(:uid, :role_id)"""
         )
-        session.execute(statement, **data)
+        session.execute(statement, data)
+
+        data = {
+            "p_no": user.p_no,
+            "email": user.email,
+            "_date": date.today(),
+        }
+        statement = text(
+            """INSERT INTO 
+            crew_personal(`p-no`, email, name, gender, email2, base, marital_status, seniority, eye_color, hair_color, dob, employment, Image) 
+                                  VALUES(:p_no, :email, '', '', '', '', '', '', '', '', :_date, :_date, '')"""
+        )
+        session.execute(statement, data)
 
         session.commit()
 
         response = {
             "status_code": status.HTTP_201_CREATED,
             "detail": "User created successfully",
-            "p_no": user.p_no,
+            "uid": uid,
         }
         return jsonable_encoder(response)
     except Exception as e:
+        session.rollback()
         print("Error", e)
         print(traceback.format_exc())
         raise HTTPException(
@@ -87,31 +108,46 @@ async def login(
     """
     ## Login a user
     This requires
-        ```
-            p_no:int
-            email:str
-        ```
-    and returns a token pair `access`
+    ```
+        -uid: int
+        -password: str
+        -p_no: str
+    ```
+    returns a secret key to be used for authentication
     """
     try:
         outs = session.execute(
-            "SELECT * FROM crew_personal where p-no = :p-no and email = :email",
-            {"p-no": user.p_no, "email": user.emailF},
+            "SELECT * FROM users where uid = :uid and password = :password",
+            {"uid": user.uid, "password": user.password},
+        )
+        db_user = outs.fetchone()
+
+        if db_user is None:
+            res = {
+                "status_code": status.HTTP_403_FORBIDDEN,
+                "detail": "Wrong uid or password",
+            }
+            return res
+
+        outs = session.execute(
+            "SELECT * FROM crew_personal where `p-no` = :p_no",
+            {"p_no": user.p_no},
         )
         db_user = outs.fetchone()
 
         if db_user:
+            users_dict[user.p_no] = str(generate_random_number(size=7))
             res = {
                 "status_code": status.HTTP_201_CREATED,
                 "detail": "Login Successfully",
-                "p_no": db_user.p_no,
+                "secret_key": users_dict[user.p_no],
             }
             return res
 
         response.status_code = status.HTTP_400_BAD_REQUEST
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid p_no Or email",
+            detail="Invalid p_no",
         )
 
     except Exception as e:
@@ -143,15 +179,15 @@ async def profile(
 
         # Execute the
         user_profile = session.execute(text(sql_query), params)
-        user_profile = [_profile for _profile in user_profile]
-        if len(user_profile) == 0:
+        user_profile = user_profile.fetchone()
+        if user_profile is None:
             response = {
                 "status_code": status.HTTP_404_NOT_FOUND,
                 "detail": "Profile not found",
             }
             return response
 
-        user_profile = UpdateUserProfile(**user_profile[0])
+        user_profile = UpdateUserProfile(**user_profile)
         p_query = ""
 
         for u_field in user_profile.dict().keys():
@@ -203,8 +239,8 @@ async def get_profile(cid: str, session: Session = Depends(deps.get_session)):
 
         # Execute the query
         user_profile = session.execute(text(sql_query), params)
-        user_profile = [_profile for _profile in user_profile]
-        if len(user_profile) == 0:
+        user_profile = user_profile.fetchone()
+        if user_profile is None:
             response = {
                 "status_code": status.HTTP_404_NOT_FOUND,
                 "detail": "Profile not found",
@@ -214,7 +250,7 @@ async def get_profile(cid: str, session: Session = Depends(deps.get_session)):
         response = {
             "status_code": status.HTTP_200_OK,
             "detail": "Profile retrieved successfully",
-            "profile": GetUserProfile(**user_profile[0]),
+            "profile": GetUserProfile(**user_profile),
         }
     except Exception as e:
         response = {
