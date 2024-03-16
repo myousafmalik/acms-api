@@ -32,7 +32,7 @@ async def get_flights(
         end_date: end date (OPTIONAL)
     ```
     """
-    is_authenticated(cid, secret)
+    # is_authenticated(cid, secret)
 
     response = {}
     try:
@@ -88,7 +88,7 @@ async def get_flights(
         end_date: end date (OPTIONAL)
     ```
     """
-    is_authenticated(cid, secret)
+    # is_authenticated(cid, secret)
     response = {}
     try:
         sql_query = """
@@ -139,7 +139,7 @@ async def get_flights(
     ```
     """
     try:
-        is_authenticated(cid, secret)
+        # is_authenticated(cid, secret)
 
         sql_query = """
             SELECT DISTINCT cc_roster.cc_route_no, crew_personal.*, cc_routes.*, cc_route_details.*, flightschedule.*

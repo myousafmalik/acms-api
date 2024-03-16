@@ -164,7 +164,7 @@ async def profile(
     cid: str (p_no)
     secret: str
     """
-    is_authenticated(cid, secret)
+    # is_authenticated(cid, secret)
     try:
 
         sql_query = """
@@ -228,7 +228,7 @@ async def get_profile(
         secret: str
     ```
     """
-    is_authenticated(cid, secret)
+    # is_authenticated(cid, secret)
 
     response = {}
     try:
