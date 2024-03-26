@@ -16,7 +16,14 @@ def get_session() -> Generator:
 
 
 def is_authenticated(p_no: str, secret: str):
-    if p_no not in users_dict or users_dict[p_no] != secret:
+
+    if p_no not in users_dict:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Wrong p-no",
+        )
+
+    if users_dict[p_no] != secret:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Wrong secret key",

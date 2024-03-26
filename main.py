@@ -53,9 +53,8 @@ def custom_openapi():
         return app.openapi_schema
 
     openapi_schema = get_openapi(
-        title="TB Data Collection",
+        title="ACMS",
         version="0.0.1",
-        description="Tb Data Collection APIS, to store audios",
         routes=app.routes,
     )
 

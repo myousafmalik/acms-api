@@ -5,7 +5,7 @@ from typing import Any
 class UserLogin(BaseModel):
     p_no: str
     password: str
-    uid: int
+    uid: int | None = None
 
 
 class UserSignUp(BaseModel):

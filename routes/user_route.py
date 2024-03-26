@@ -109,38 +109,38 @@ async def login(
     """
     try:
         outs = session.execute(
-            "SELECT * FROM users where uid = :uid and password = :password",
-            {"uid": user.uid, "password": user.password},
+            "SELECT * FROM crew_personal where `p-no` = :p_no",
+            {"p_no": user.p_no},
         )
         db_user = outs.fetchone()
 
         if db_user is None:
             res = {
                 "status_code": status.HTTP_403_FORBIDDEN,
-                "detail": "Wrong uid or password",
+                "detail": "Wrong p_no",
             }
             return res
 
         outs = session.execute(
-            "SELECT * FROM crew_personal where `p-no` = :p_no",
-            {"p_no": user.p_no},
+            "SELECT * FROM users where uid = :uid and password = :password",
+            {"uid": db_user.uid, "password": user.password},
         )
-        db_user = outs.fetchone()
+        db_crew_user = outs.fetchone()
 
-        if db_user:
-            users_dict[user.p_no] = str(generate_random_number(size=7))
+        if db_crew_user is None:
             res = {
-                "status_code": status.HTTP_201_CREATED,
-                "detail": "Login Successfully",
-                "secret_key": users_dict[user.p_no],
+                "status_code": status.HTTP_403_FORBIDDEN,
+                "detail": "Wrong uid or password",
             }
             return res
 
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid p_no",
-        )
+        users_dict[db_user["p-no"]] = str(generate_random_number(size=7))
+        res = {
+            "status_code": status.HTTP_201_CREATED,
+            "detail": "Login Successfully",
+            "secret_key": users_dict[user.p_no],
+        }
+        return res
 
     except Exception as e:
         print("Error", e)
